@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dodgem Game</title>
+    <link rel="stylesheet" href="css.css">
+    <style>
+
+        
+    </style>
+</head>
+<body>
+    <div class="sound-control">
+        <button id="toggleMusic" class="sound-button">🎵</button>
+        <button id="toggleSound" class="sound-button">🔊</button>
+    </div>
+
+    <div class="game-container">
+        <h1 class="game-title">Dodgem Game</h1>
+        
+        <!-- Menu Screen -->
+        <div id="menuScreen" class="menu-screen">
+            <div class="controls">
+                <select id="difficulty">
+                    <option value="easy">Easy</option>
+                    <option value="normal">Normal</option>
+                    <option value="hard">Hard</option>
+                </select>
+                <button id="startGame">Start Game</button>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="gameScreen" class="game-screen">
+            <div class="board" id="board"></div>
+            <div id="message"></div>
+            <div class="controls">
+                <button id="playAgain" style="display: none;">Play Again</button>
+                <button id="newGame">New Game</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Previous game logic remains the same
+        let currentPlayer = 'B';
+        let gameBoard = [
+            ['B', ' ', ' '],
+            ['B', ' ', ' '],
+            [' ', 'W', 'W']
+        ];
+        let jumpedPieces = { B: 0, W: 0 };
+        let gameOver = false;
+        let selectedPiece = null;
+        let currentDifficulty = 'easy';
+
+        // Sound related variables
+        let backgroundMusic = new Audio('ok.mp3');
+        let moveSound = new Audio('ok.mp3');
+        let winSound = new Audio('nhacwin.mp3');
+        let loseSound = new Audio('nhạc lose.mp3');
+
+        let isMusicMuted = false;
+        let isSoundMuted = false;
+
+        // Sound control setup
+        backgroundMusic.loop = true;
+        const toggleMusicBtn = document.getElementById('toggleMusic');
+        const toggleSoundBtn = document.getElementById('toggleSound');
+
+        toggleMusicBtn.addEventListener('click', () => {
+            isMusicMuted = !isMusicMuted;
+            toggleMusicBtn.classList.toggle('muted');
+            if (isMusicMuted) {
+                backgroundMusic.pause();
+            } else {
+                backgroundMusic.play();
+            }
+        });
+
+        toggleSoundBtn.addEventListener('click', () => {
+            isSoundMuted = !isSoundMuted;
+            toggleSoundBtn.classList.toggle('muted');
+        });
+
+        // Function to play sound effects
+        function playSound(sound) {
+            if (!isSoundMuted && sound) {
+                sound.currentTime = 0;
+                sound.play();
+            }
+        }
+
+        // DOM Elements
+        const menuScreen = document.getElementById('menuScreen');
+        const gameScreen = document.getElementById('gameScreen');
+        const board = document.getElementById('board');
+        const message = document.getElementById('message');
+        const difficultySelect = document.getElementById('difficulty');
+        const startGameButton = document.getElementById('startGame');
+        const playAgainButton = document.getElementById('playAgain');
+        const newGameButton = document.getElementById('newGame');
+
+        // Initialize game
+        startGameButton.addEventListener('click', () => {
+            currentDifficulty = difficultySelect.value;
+            menuScreen.style.display = 'none';
+            gameScreen.style.display = 'block';
+            startNewGame();
+            if (!isMusicMuted) {
+                backgroundMusic.play();
+            }
+        });
+
+        playAgainButton.addEventListener('click', () => {
+            menuScreen.style.display = 'block';
+            gameScreen.style.display = 'none';
+            playAgainButton.style.display = 'none';
+            backgroundMusic.currentTime = 0;
+        });
+
+        newGameButton.addEventListener('click', () => {
+            menuScreen.style.display = 'block';
+            gameScreen.style.display = 'none';
+            backgroundMusic.currentTime = 0;
+        });
+
+        // Update the win/lose logic to include sounds
+        function handleWin(isPlayer) {
+            gameOver = true;
+            if (isPlayer) {
+                message.textContent = "You win!";
+                playSound(winSound);
+            } else {
+                message.textContent = "AI wins!";
+                playSound(loseSound);
+            }
+            message.classList.add('win-animation');
+            playAgainButton.style.display = 'inline-block';
+            backgroundMusic.pause();
+            backgroundMusic.currentTime = 0;
+        }
+
+        // Update makeMove to include sound
+        function makeMove(fromRow, fromCol, toRow, toCol) {
+            gameBoard[toRow][toCol] = gameBoard[fromRow][fromCol];
+            gameBoard[fromRow][fromCol] = ' ';
+            playSound(moveSound);
+        }
+
+        // Rest of the game logic remains the same
+        function startNewGame() {
+            gameBoard = [
+                ['B', ' ', ' '],
+                ['B', ' ', ' '],
+                [' ', 'W', 'W']
+            ];
+            jumpedPieces = { B: 0, W: 0 };
+            gameOver = false;
+            currentPlayer = 'B';
+            selectedPiece = null;
+            message.textContent = 'Your turn';
+            playAgainButton.style.display = 'none';
+            createBoard();
+        }
+
+        // Previous functions remain the same...
+        
+        // Update handleJumpOut to include sound
+        function handleJumpOut(row, col) {
+            if (gameOver) return;
+            
+            if ((currentPlayer === 'B' && col === 2) || (currentPlayer === 'W' && row === 0)) {
+                const piece = gameBoard[row][col];
+                if (piece === currentPlayer) {
+                    jumpedPieces[piece]++;
+                    gameBoard[row][col] = ' ';
+                    playSound(moveSound);
+                    
+                    if (jumpedPieces[piece] === 2) {
+                        handleWin(currentPlayer === 'B');
+                    }
+                    
+                    currentPlayer = currentPlayer === 'B' ? 'W' : 'B';
+                    if (currentPlayer === 'W') {
+                        setTimeout(makeAIMove, 1000);
+                    }
+                    createBoard();
+                }
+            }
+        }
+
+        function createBoard() {
+            board.innerHTML = '';
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    
+                    if (gameBoard[i][j] !== ' ') {
+                        const piece = createPiece(gameBoard[i][j], i, j);
+                        cell.appendChild(piece);
+                        
+                        if (
+                            (gameBoard[i][j] === 'B' && j === 2 && currentPlayer === 'B') ||
+                            (gameBoard[i][j] === 'W' && i === 0 && currentPlayer === 'W')
+                        ) {
+                            const jumpButton = document.createElement('button');
+                            jumpButton.className = 'jump-button';
+                            jumpButton.textContent = 'Jump Out!';
+                            jumpButton.onclick = (e) => {
+                                e.stopPropagation();
+                                handleJumpOut(i, j);
+                            };
+                            cell.appendChild(jumpButton);
+                            cell.classList.add('can-jump');
+                        }
+                    }
+                    
+                    cell.addEventListener('click', handleCellClick);
+                    board.appendChild(cell);
+                }
+            }
+        }
+
+        function createPiece(type, row, col) {
+            const piece = document.createElement('div');
+            piece.className = `piece ${type === 'B' ? 'black' : 'white'}`;
+            piece.textContent = type;
+            piece.dataset.row = row;
+            piece.dataset.col = col;
+            return piece;
+        }
+
+        function handleCellClick(e) {
+            if (gameOver || currentPlayer !== 'B') return;
+
+            const clickedCell = e.target.closest('.cell');
+            const row = parseInt(clickedCell.dataset.row);
+            const col = parseInt(clickedCell.dataset.col);
+
+            if (selectedPiece) {
+                const fromRow = parseInt(selectedPiece.dataset.row);
+                const fromCol = parseInt(selectedPiece.dataset.col);
+
+                if (isValidMove(fromRow, fromCol, row, col)) {
+                    makeMove(fromRow, fromCol, row, col);
+                    selectedPiece.classList.remove('selected-piece');
+                    selectedPiece = null;
+                    createBoard();
+                    if (!gameOver) {
+                        currentPlayer = 'W';
+                        message.textContent = "AI's turn";
+                        setTimeout(makeAIMove, 1000);
+                    }
+                } else {
+                    selectedPiece.classList.remove('selected-piece');
+                    selectedPiece = null;
+                    message.textContent = "Invalid move. Select a piece to move.";
+                }
+            } else if (gameBoard[row][col] === 'B') {
+                selectedPiece = clickedCell.firstChild;
+                selectedPiece.classList.add('selected-piece');
+                message.textContent = "Select a destination for the piece.";
+            }
+        }
+
+        function isValidMove(fromRow, fromCol, toRow, toCol) {
+            if (gameBoard[toRow][toCol] !== ' ') return false;
+            
+            const rowDiff = Math.abs(fromRow - toRow);
+            const colDiff = Math.abs(fromCol - toCol);
+            
+            // Can only move one step horizontally or vertically
+            return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
+        }
+
+        function evaluatePosition(row, col, pieceType) {
+            const SCORE_MATRIX = [
+                [40, 35, 30],
+                [25, 20, 15],
+                [10, 5, 0]
+            ];
+            
+            let score = SCORE_MATRIX[row][col];
+            
+            // Adjust score based on piece type and position
+            if (pieceType === 'W') {
+                if (row === 0) {
+                    score += 85; // High bonus for reaching the top row
+                }
+            } else {
+                // For black pieces, reverse the score matrix
+                score = SCORE_MATRIX[2-row][2-col];
+                if (col === 2) {
+                    score += 85; // High bonus for reaching the rightmost column
+                }
+            }
+            return score;
+        }
+
+        function evaluateBlocking(fromRow, fromCol, toRow, toCol, pieceType) {
+            let blockingScore = 0;
+            
+            if (pieceType === 'W') {
+                // Check if move blocks black pieces
+                if (toRow + 1 < 3 && gameBoard[toRow + 1][toCol] === 'B') {
+                    blockingScore += 40;
+                }
+                
+                // Bonus for blocking diagonal movements
+                if (toRow + 1 < 3 && toCol + 1 < 3 && gameBoard[toRow + 1][toCol + 1] === 'B') {
+                    blockingScore += 30;
+                }
+                if (toRow + 1 < 3 && toCol - 1 >= 0 && gameBoard[toRow + 1][toCol - 1] === 'B') {
+                    blockingScore += 30;
+                }
+            }
+            return blockingScore;
+        }
+
+        function evaluateMove(fromRow, fromCol, toRow, toCol, pieceType) {
+            let score = evaluatePosition(toRow, toCol, pieceType);
+            score += evaluateBlocking(fromRow, fromCol, toRow, toCol, pieceType);
+            return score;
+        }
+
+        function getAvailableMoves(pieceType) {
+            const moves = [];
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    if (gameBoard[i][j] === pieceType) {
+                        const directions = [
+                            { row: i + 1, col: j },
+                            { row: i - 1, col: j },
+                            { row: i, col: j + 1 },
+                            { row: i, col: j - 1 }
+                        ];
+                        
+                        directions.forEach(move => {
+                            if (move.row >= 0 && move.row < 3 && 
+                                move.col >= 0 && move.col < 3 && 
+                                gameBoard[move.row][move.col] === ' ') {
+                                moves.push({
+                                    fromRow: i,
+                                    fromCol: j,
+                                    toRow: move.row,
+                                    toCol: move.col
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+            return moves;
+        }
+
+        function makeAIMove() {
+            if (gameOver) return;
+            
+            const availableMoves = getAvailableMoves('W');
+            if (availableMoves.length === 0) {
+                handleWin(true); // Player wins if AI has no moves
+                return;
+            }
+
+            // Check if there's a piece that can jump out
+            let jumpOutPiece = null;
+            for (let j = 0; j < 3; j++) {
+                if (gameBoard[0][j] === 'W') {
+                    jumpOutPiece = {row: 0, col: j};
+                    break;
+                }
+            }
+
+            // If there's a piece that can jump out, do it
+            if (jumpOutPiece) {
+                jumpedPieces['W']++;
+                gameBoard[jumpOutPiece.row][jumpOutPiece.col] = ' ';
+                playSound(moveSound);
+                
+                if (jumpedPieces['W'] === 2) {
+                    handleWin(false); // AI wins
+                }
+            } else {
+                // Calculate scores for all available moves
+                availableMoves.forEach(move => {
+                    move.score = evaluateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, 'W');
+                });
+
+                // Sort moves by score in descending order
+                availableMoves.sort((a, b) => b.score - a.score);
+
+                let selectedMove;
+                
+                switch(currentDifficulty) {
+                    case 'hard':
+                        // Choose the best move
+                        selectedMove = availableMoves[0];
+                        break;
+                    case 'normal':
+                        // Choose randomly from the top 2 moves
+                        const topMoves = availableMoves.slice(0, Math.min(2, availableMoves.length));
+                        selectedMove = topMoves[Math.floor(Math.random() * topMoves.length)];
+                        break;
+                    case 'easy':
+                        // Choose randomly from the bottom 2 moves
+                        const bottomMoves = availableMoves.slice(Math.max(0, availableMoves.length - 2));
+                        selectedMove = bottomMoves[Math.floor(Math.random() * bottomMoves.length)];
+                        break;
+                }
+
+                makeMove(selectedMove.fromRow, selectedMove.fromCol, selectedMove.toRow, selectedMove.toCol);
+            }
+
+            currentPlayer = 'B';
+            createBoard();
+            if (!gameOver) {
+                message.textContent = "Your turn";
+            }
+        }
+        window.onload = () => {
+            menuScreen.style.display = 'block';
+            gameScreen.style.display = 'none';
+        };
+    </script>
+</body>
+</html>
+
+
+
