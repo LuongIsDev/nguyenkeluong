@@ -269,14 +269,26 @@
         }
 
         function isValidMove(fromRow, fromCol, toRow, toCol) {
-            if (gameBoard[toRow][toCol] !== ' ') return false;
-            
-            const rowDiff = Math.abs(fromRow - toRow);
-            const colDiff = Math.abs(fromCol - toCol);
-            
-            // Can only move one step horizontally or vertically
-            return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
-        }
+    if (gameBoard[toRow][toCol] !== ' ') return false;
+    
+    const piece = gameBoard[fromRow][fromCol];
+    const rowDiff = toRow - fromRow;
+    const colDiff = toCol - fromCol;
+    
+    if (piece === 'B') {
+        // Black pieces can move up, down, or right
+        if (colDiff === 1 && rowDiff === 0) return true; // Move right
+        if (colDiff === 0 && (Math.abs(rowDiff) === 1)) return true; // Move up or down
+        return false;
+    } else if (piece === 'W') {
+        // White pieces can move left, right, or up
+        if (rowDiff === -1 && colDiff === 0) return true; // Move up
+        if (rowDiff === 0 && (Math.abs(colDiff) === 1)) return true; // Move left or right
+        return false;
+    }
+    return false;
+}
+
 
         function evaluatePosition(row, col, pieceType) {
             const SCORE_MATRIX = [
@@ -322,6 +334,73 @@
             return blockingScore;
         }
 
+        function evaluateBoard(board, playerType) {
+    let score = 0;
+    
+    // Evaluate position and mobility for each piece
+    for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+            if (board[i][j] === playerType) {
+                score += evaluatePosition(i, j, playerType);
+                
+                // Add mobility score
+                const availableMoves = getValidMovesForPiece(board, i, j);
+                score += availableMoves.length * 5;
+                
+                // Add bonus for pieces near their goal
+                if (playerType === 'W' && i === 0) score += 50;
+                if (playerType === 'B' && j === 2) score += 50;
+            }
+        }
+    }
+    function getValidMovesForPiece(board, row, col) {
+    const moves = [];
+    const piece = board[row][col];
+    
+    if (piece === 'B') {
+        // Black pieces can move up, down, or right
+        const directions = [
+            { row: 1, col: 0 },  // down
+            { row: -1, col: 0 }, // up
+            { row: 0, col: 1 }   // right
+        ];
+        
+        directions.forEach(dir => {
+            const newRow = row + dir.row;
+            const newCol = col + dir.col;
+            
+            if (newRow >= 0 && newRow < 3 && newCol >= 0 && newCol < 3 && board[newRow][newCol] === ' ') {
+                moves.push({ fromRow: row, fromCol: col, toRow: newRow, toCol: newCol });
+            }
+        });
+    } else if (piece === 'W') {
+        // White pieces can move left, right, or up
+        const directions = [
+            { row: -1, col: 0 }, // up
+            { row: 0, col: 1 },  // right
+            { row: 0, col: -1 }  // left
+        ];
+        
+        directions.forEach(dir => {
+            const newRow = row + dir.row;
+            const newCol = col + dir.col;
+            
+            if (newRow >= 0 && newRow < 3 && newCol >= 0 && newCol < 3 && board[newRow][newCol] === ' ') {
+                moves.push({ fromRow: row, fromCol: col, toRow: newRow, toCol: newCol });
+            }
+        });
+    }
+    
+    return moves;
+}
+    
+    // Consider jumped out pieces
+    const jumpedScore = (playerType === 'W' ? jumpedPieces['W'] : jumpedPieces['B']) * 100;
+    score += jumpedScore;
+    
+    return score;
+}
+
         function evaluateMove(fromRow, fromCol, toRow, toCol, pieceType) {
             let score = evaluatePosition(toRow, toCol, pieceType);
             score += evaluateBlocking(fromRow, fromCol, toRow, toCol, pieceType);
@@ -357,8 +436,79 @@
             }
             return moves;
         }
+        function minimax(board, depth, alpha, beta, isMaximizing) {
+    if (depth === 0) {
+        return evaluateBoard(board, isMaximizing ? 'W' : 'B');
+    }
+    
+    if (isMaximizing) {
+        let maxEval = -Infinity;
+        const moves = getAllPossibleMoves(board, 'W');
+        
+        for (const move of moves) {
+            // Make move
+            const newBoard = JSON.parse(JSON.stringify(board));
+            newBoard[move.toRow][move.toCol] = newBoard[move.fromRow][move.fromCol];
+            newBoard[move.fromRow][move.fromCol] = ' ';
+            
+            const evalScore = minimax(newBoard, depth - 1, alpha, beta, false);
+            maxEval = Math.max(maxEval, evalScore);
+            alpha = Math.max(alpha, evalScore);
+            
+            if (beta <= alpha) {
+                break; // Beta cut-off
+            }
+        }
+        return maxEval;
+    } else {
+        let minEval = Infinity;
+        const moves = getAllPossibleMoves(board, 'B');
+        
+        for (const move of moves) {
+            // Make move
+            const newBoard = JSON.parse(JSON.stringify(board));
+            newBoard[move.toRow][move.toCol] = newBoard[move.fromRow][move.fromCol];
+            newBoard[move.fromRow][move.fromCol] = ' ';
+            
+            const evalScore = minimax(newBoard, depth - 1, alpha, beta, true);
+            minEval = Math.min(minEval, evalScore);
+            beta = Math.min(beta, evalScore);
+            
+            if (beta <= alpha) {
+                break; // Alpha cut-off
+            }
+        }
+        return minEval;
+    }
+}
 
-        function makeAIMove() {
+function getAllPossibleMoves(board, playerType) {
+    const moves = [];
+    
+    // Regular moves
+    for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+            if (board[i][j] === playerType) {
+                moves.push(...getValidMovesForPiece(board, i, j));
+            }
+        }
+    }
+    
+    // Jump out moves
+    for (let i = 0; i < 3; i++) {
+        if (playerType === 'W' && board[0][i] === 'W') {
+            moves.push({ fromRow: 0, fromCol: i, isJumpOut: true });
+        }
+        if (playerType === 'B' && board[i][2] === 'B') {
+            moves.push({ fromRow: i, fromCol: 2, isJumpOut: true });
+        }
+    }
+    
+    return moves;
+}
+
+
+function makeAIMove() {
             if (gameOver) return;
             
             const availableMoves = getAvailableMoves('W');
@@ -422,6 +572,18 @@
                 message.textContent = "Your turn";
             }
         }
+        function getDifficultyDepth() {
+    switch(currentDifficulty) {
+        case 'hard':
+            return 4;
+        case 'normal':
+            return 3;
+        case 'easy':
+            return 2;
+        default:
+            return 3;
+    }
+}
         window.onload = () => {
             menuScreen.style.display = 'block';
             gameScreen.style.display = 'none';
