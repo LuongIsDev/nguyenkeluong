@@ -270,24 +270,25 @@
 
         function isValidMove(fromRow, fromCol, toRow, toCol) {
     if (gameBoard[toRow][toCol] !== ' ') return false;
-    
+
     const piece = gameBoard[fromRow][fromCol];
     const rowDiff = toRow - fromRow;
     const colDiff = toCol - fromCol;
-    
+
     if (piece === 'B') {
         // Black pieces can move up, down, or right
         if (colDiff === 1 && rowDiff === 0) return true; // Move right
         if (colDiff === 0 && (Math.abs(rowDiff) === 1)) return true; // Move up or down
         return false;
     } else if (piece === 'W') {
-        // White pieces can move left, right, or up
-        if (rowDiff === -1 && colDiff === 0) return true; // Move up
+        // White pieces can move left, right, or up (no moving down)
+        if (rowDiff === -1 && colDiff === 0) return true; // Move up only
         if (rowDiff === 0 && (Math.abs(colDiff) === 1)) return true; // Move left or right
         return false;
     }
     return false;
 }
+
 
 
         function evaluatePosition(row, col, pieceType) {
@@ -299,16 +300,15 @@
             
             let score = SCORE_MATRIX[row][col];
             
-            // Adjust score based on piece type and position
             if (pieceType === 'W') {
                 if (row === 0) {
-                    score += 85; // High bonus for reaching the top row
+                    score += 85; 
                 }
             } else {
-                // For black pieces, reverse the score matrix
+                
                 score = SCORE_MATRIX[2-row][2-col];
                 if (col === 2) {
-                    score += 85; // High bonus for reaching the rightmost column
+                    score += 85;
                 }
             }
             return score;
@@ -318,12 +318,12 @@
             let blockingScore = 0;
             
             if (pieceType === 'W') {
-                // Check if move blocks black pieces
+                
                 if (toRow + 1 < 3 && gameBoard[toRow + 1][toCol] === 'B') {
                     blockingScore += 40;
                 }
                 
-                // Bonus for blocking diagonal movements
+                
                 if (toRow + 1 < 3 && toCol + 1 < 3 && gameBoard[toRow + 1][toCol + 1] === 'B') {
                     blockingScore += 30;
                 }
@@ -509,69 +509,80 @@ function getAllPossibleMoves(board, playerType) {
 
 
 function makeAIMove() {
-            if (gameOver) return;
-            
-            const availableMoves = getAvailableMoves('W');
-            if (availableMoves.length === 0) {
-                handleWin(true); // Player wins if AI has no moves
-                return;
-            }
-
-            // Check if there's a piece that can jump out
-            let jumpOutPiece = null;
-            for (let j = 0; j < 3; j++) {
-                if (gameBoard[0][j] === 'W') {
-                    jumpOutPiece = {row: 0, col: j};
-                    break;
-                }
-            }
-
-            // If there's a piece that can jump out, do it
-            if (jumpOutPiece) {
-                jumpedPieces['W']++;
-                gameBoard[jumpOutPiece.row][jumpOutPiece.col] = ' ';
-                playSound(moveSound);
-                
-                if (jumpedPieces['W'] === 2) {
-                    handleWin(false); // AI wins
-                }
-            } else {
-                // Calculate scores for all available moves
-                availableMoves.forEach(move => {
-                    move.score = evaluateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, 'W');
-                });
-
-                // Sort moves by score in descending order
-                availableMoves.sort((a, b) => b.score - a.score);
-
-                let selectedMove;
-                
-                switch(currentDifficulty) {
-                    case 'hard':
-                        // Choose the best move
-                        selectedMove = availableMoves[0];
-                        break;
-                    case 'normal':
-                        // Choose randomly from the top 2 moves
-                        const topMoves = availableMoves.slice(0, Math.min(3, availableMoves.length));
-                        selectedMove = topMoves[Math.floor(Math.random() * topMoves.length)];
-                        break;
-                    case 'easy':
-                        // Choose randomly from the bottom 2 moves
-                        const bottomMoves = availableMoves.slice(Math.max(0, availableMoves.length - 2));
-                        selectedMove = bottomMoves[Math.floor(Math.random() * bottomMoves.length)];
-                        break;
-                }
-
-                makeMove(selectedMove.fromRow, selectedMove.fromCol, selectedMove.toRow, selectedMove.toCol);
-            }
-
-            currentPlayer = 'B';
-            createBoard();
-            if (!gameOver) {
-                message.textContent = "Your turn";
+    if (gameOver) return;
+    
+    const availableMoves = getAvailableMoves('W');
+    
+    // Check if White has any valid moves left
+    if (availableMoves.length === 0) {
+        // Check if White can jump out
+        let canJumpOut = false;
+        for (let j = 0; j < 3; j++) {
+            if (gameBoard[0][j] === 'W') {
+                canJumpOut = true;
+                break;
             }
         }
+        
+        // If White can't move and can't jump out, Black wins
+        if (!canJumpOut) {
+            handleWin(true); // Player (Black) wins
+            return;
+        }
+    }
+
+    // Check if there's a piece that can jump out
+    let jumpOutPiece = null;
+    for (let j = 0; j < 3; j++) {
+        if (gameBoard[0][j] === 'W') {
+            jumpOutPiece = {row: 0, col: j};
+            break;
+        }
+    }
+
+    // If there's a piece that can jump out, do it
+    if (jumpOutPiece) {
+        jumpedPieces['W']++;
+        gameBoard[jumpOutPiece.row][jumpOutPiece.col] = ' ';
+        playSound(moveSound);
+        
+        if (jumpedPieces['W'] === 2) {
+            handleWin(false); // AI wins
+        }
+    } else if (availableMoves.length > 0) {
+        // Calculate scores for all available moves
+        availableMoves.forEach(move => {
+            move.score = evaluateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, 'W');
+        });
+
+        // Sort moves by score in descending order
+        availableMoves.sort((a, b) => b.score - a.score);
+
+        let selectedMove;
+        
+        switch(currentDifficulty) {
+            case 'hard':
+                selectedMove = availableMoves[0];
+                break;
+            case 'normal':
+                const topMoves = availableMoves.slice(0, Math.min(3, availableMoves.length));
+                selectedMove = topMoves[Math.floor(Math.random() * topMoves.length)];
+                break;
+            case 'easy':
+                const bottomMoves = availableMoves.slice(Math.max(0, availableMoves.length - 2));
+                selectedMove = bottomMoves[Math.floor(Math.random() * bottomMoves.length)];
+                break;
+        }
+
+        makeMove(selectedMove.fromRow, selectedMove.fromCol, selectedMove.toRow, selectedMove.toCol);
+    }
+
+    currentPlayer = 'B';
+    createBoard();
+    if (!gameOver) {
+        message.textContent = "Your turn";
+    }
+}
         function getDifficultyDepth() {
 
                     
